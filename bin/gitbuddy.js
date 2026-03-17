@@ -7,6 +7,14 @@ import commitCommand from '../src/commands/commit.js';
 import pushCommand from '../src/commands/push.js';
 import pullCommand from '../src/commands/pull.js';
 import { checkGitInstalled } from '../src/utils/git.js';
+import branchCommand from '../src/commands/branch.js';
+import switchCommand from '../src/commands/switch.js';
+import mergeCommand from '../src/commands/merge.js';
+import undoCommand from '../src/commands/undo.js';
+import historyCommand from '../src/commands/history.js';
+import diffCommand from '../src/commands/diff.js';
+import explainCommand from '../src/commands/explain.js';
+import langCommand from '../src/commands/lang.js';
 
 // ✅ Check Git installed FIRST
 const gitInstalled = await checkGitInstalled();
@@ -41,5 +49,44 @@ program
     .command('pull')
     .description('Safely pull latest changes from GitHub')
     .action(pullCommand);
+
+program
+    .command('branch [name]')
+    .description('Create or list branches')
+    .action(branchCommand);
+
+program
+    .command('switch [branch]')
+    .description('Switch to another branch')
+    .action(switchCommand);
+
+program
+    .command('merge [branch]')
+    .description('Safely merge branches')
+    .action(mergeCommand);
+
+program
+    .command('undo')
+    .description('Safely undo git actions')
+    .action(undoCommand);
+
+program
+    .command('history')
+    .description('Show commit history in plain English')
+    .action(historyCommand);
+
+program
+    .command('diff')
+    .description('Show what changed in your files')
+    .action(diffCommand);
+program
+    .command('explain [error]')
+    .description('Explain git errors in plain English')
+    .action(explainCommand);
+
+program
+    .command('lang')
+    .description('Change GitBuddy language')
+    .action(langCommand);
 
 program.parse(process.argv);

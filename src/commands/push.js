@@ -2,9 +2,9 @@
 
 import chalk from 'chalk';
 import boxen from 'boxen';
-import inquirer from 'inquirer';
 import gitUtils from '../utils/git.js';
 import messages from '../utils/messages.js';
+import { confirm } from '@inquirer/prompts';
 
 async function pushCommand() {
     try {
@@ -57,14 +57,10 @@ async function pushCommand() {
                 )
             );
 
-            const { proceed } = await inquirer.prompt([
-                {
-                    type: 'confirm',
-                    name: 'proceed',
-                    message: 'Push anyway without these files?',
-                    default: false
-                }
-            ]);
+            const proceed = await confirm({
+                message: 'Push anyway without these files?',
+                default: false
+              });
 
             if (!proceed) {
                 messages.info('Push cancelled. Run gitbuddy commit first!', 'GitBuddy Push');
@@ -89,14 +85,11 @@ async function pushCommand() {
                 )
             );
 
-            const { proceed } = await inquirer.prompt([
-                {
-                    type: 'confirm',
-                    name: 'proceed',
-                    message: `Push to "${repo.branch}" anyway?`,
-                    default: true
-                }
-            ]);
+            const proceed = await confirm({
+                message: `Push to "${repo.branch}" anyway?`,
+                default: true
+            });
+              
 
             if (!proceed) {
                 messages.info('Push cancelled.', 'GitBuddy Push');

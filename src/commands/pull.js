@@ -2,7 +2,7 @@
 
 import chalk from 'chalk';
 import boxen from 'boxen';
-import inquirer from 'inquirer';
+import { select, confirm, input } from '@inquirer/prompts';
 import gitUtils from '../utils/git.js';
 import messages from '../utils/messages.js';
 
@@ -53,31 +53,15 @@ async function pullCommand() {
             );
 
             // Ask user what to do
-            const { action } = await inquirer.prompt([
-                {
-                    type: 'list',
-                    name: 'action',
-                    message: 'What do you want to do?',
-                    choices: [
-                        {
-                            name: '✅ Commit first then pull (recommended)',
-                            value: 'commit'
-                        },
-                        {
-                            name: '📦 Stash changes, pull, then restore (smart)',
-                            value: 'stash'
-                        },
-                        {
-                            name: '⚠️  Pull anyway (risky)',
-                            value: 'pull'
-                        },
-                        {
-                            name: '❌ Cancel',
-                            value: 'cancel'
-                        }
-                    ]
-                }
-            ]);
+            const action = await select({
+                message: 'What do you want to do?',
+                choices: [
+                    { name: '✅ Commit first then pull (recommended)', value: 'commit' },
+                    { name: '📦 Stash changes, pull, then restore (smart)', value: 'stash' },
+                    { name: '⚠️  Pull anyway (risky)', value: 'pull' },
+                    { name: '❌ Cancel', value: 'cancel' }
+                ]
+              });
 
             if (action === 'cancel') {
                 messages.info('Pull cancelled. No changes made.', 'GitBuddy Pull');
@@ -86,14 +70,10 @@ async function pullCommand() {
 
             if (action === 'commit') {
                 // Ask for commit message
-                const { commitMessage } = await inquirer.prompt([
-                    {
-                        type: 'input',
-                        name: 'commitMessage',
-                        message: 'Enter commit message:',
-                        default: 'chore: save changes before pull'
-                    }
-                ]);
+                const commitMessage = await input({
+                    message: 'Enter commit message:',
+                    default: 'chore: save changes before pull'
+                  });
 
                 await gitUtils.stageAll();
                 const committed = await gitUtils.commit(commitMessage);
@@ -171,14 +151,12 @@ async function pullCommand() {
         // If stash was used restore it
         const stashList = await gitUtils.git.stash(['list']);
         if (stashList && stashList.includes('stash@{0}')) {
-            const { restore } = await inquirer.prompt([
-                {
-                    type: 'confirm',
-                    name: 'restore',
-                    message: 'Restore your stashed changes?',
-                    default: true
-                }
-            ]);
+
+            const restore = await confirm({
+                message: 'Restore your stashed changes?',
+                default: true
+            });
+
 
             if (restore) {
                 const popped = await gitUtils.stashPop();
