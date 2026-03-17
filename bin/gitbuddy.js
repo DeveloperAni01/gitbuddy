@@ -5,6 +5,12 @@ import statusCommand from '../src/commands/status.js';
 import ignoreCommand from '../src/commands/ignore.js';
 import commitCommand from '../src/commands/commit.js';
 import pushCommand from '../src/commands/push.js';
+import pullCommand from '../src/commands/pull.js';
+import { checkGitInstalled } from '../src/utils/git.js';
+
+// ✅ Check Git installed FIRST
+const gitInstalled = await checkGitInstalled();
+if (!gitInstalled) process.exit(1);
 
 program
     .name('gitbuddy')
@@ -30,5 +36,10 @@ program
     .command('push')
     .description('Safely push to GitHub')
     .action(pushCommand);
+
+program
+    .command('pull')
+    .description('Safely pull latest changes from GitHub')
+    .action(pullCommand);
 
 program.parse(process.argv);

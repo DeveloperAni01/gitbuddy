@@ -1,107 +1,144 @@
 'use strict';
 
-import simpleGit from 'simple-git';
 import chalk from 'chalk';
 import boxen from 'boxen';
+import inquirer from 'inquirer';
+import gitUtils from '../utils/git.js';
+import messages from '../utils/messages.js';
 
 async function pushCommand() {
-    const git = simpleGit();
-
     try {
-        // Check if git repo
-        const isRepo = await git.checkIsRepo();
-        if (!isRepo) {
-            console.log(
-                boxen(
-                    chalk.red('❌ This folder is not a Git repo!\n') +
-                    chalk.yellow('Run: git init first'),
-                    { padding: 1, borderColor: 'red', title: '🤖 GitBuddy Push', titleAlignment: 'center' }
-                )
-            );
+        // Check repo state
+        const repo = await gitUtils.checkRepo();
+        if (!repo) return;
+
+        // Check remote exists
+        const remotes = await gitUtils.checkRemote();
+        if (!remotes) return;
+
+        // Check if no commits yet
+        if (!repo.hasCommits) {
+            messages.noCommits();
             return;
         }
 
-        // Get current status
-        const status = await git.status();
-        const branch = status.current;
-
-        // Check if remote exists
-        const remotes = await git.getRemotes(true);
-        if (remotes.length === 0) {
-            console.log(
-                boxen(
-                    chalk.red('❌ No remote found!\n\n') +
-                    chalk.yellow('You need to connect your GitHub repo first:\n\n') +
-                    chalk.cyan('  git remote add origin <your-github-url>\n\n') +
-                    chalk.gray('Example:\n') +
-                    chalk.cyan('  git remote add origin https://github.com/username/repo.git'),
-                    { padding: 1, borderColor: 'red', title: '🤖 GitBuddy Push', titleAlignment: 'center' }
-                )
-            );
-            return;
-        }
-
-        // Check if there is anything to push
-        if (status.ahead === 0) {
+        // Check if nothing to push
+        if (repo.ahead === 0) {
             console.log(
                 boxen(
                     chalk.yellow('🤔 Nothing to push bro!\n\n') +
                     chalk.gray('Your GitHub is already up to date.\n') +
                     chalk.gray('Make some changes and commit first!'),
-                    { padding: 1, borderColor: 'yellow', title: '🤖 GitBuddy Push', titleAlignment: 'center' }
+                    {
+                        padding: 1,
+                        borderColor: 'yellow',
+                        title: '🤖 GitBuddy Push',
+                        titleAlignment: 'center'
+                    }
                 )
             );
             return;
         }
 
-        // Warn if pushing directly to main or master
-        if (branch === 'main' || branch === 'master') {
+        // Check uncommitted changes
+        if (repo.modified.length > 0 || repo.untracked.length > 0) {
             console.log(
                 boxen(
-                    chalk.yellow(`⚠️  Bro you are pushing directly to "${branch}"!\n\n`) +
-                    chalk.white('This is okay for personal projects.\n') +
-                    chalk.white('But in team projects always use feature branches!\n\n') +
-                    chalk.gray('Tip: gitbuddy branch "feature-name" to create a branch\n\n') +
-                    chalk.cyan('Pushing anyway in 3 seconds...'),
-                    { padding: 1, borderColor: 'yellow', title: '⚠️  GitBuddy Warning', titleAlignment: 'center' }
+                    chalk.yellow('⚠️  You have uncommitted changes!\n\n') +
+                    chalk.white('These will NOT be pushed:\n') +
+                    repo.modified.map(f => chalk.yellow(`   ~ ${f}`)).join('\n') +
+                    chalk.gray('\n\nTip: Run gitbuddy commit first!'),
+                    {
+                        padding: 1,
+                        borderColor: 'yellow',
+                        title: '⚠️  GitBuddy Warning',
+                        titleAlignment: 'center'
+                    }
                 )
             );
 
-            // Small delay so user can see warning
-            await new Promise(resolve => setTimeout(resolve, 3000));
+            const { proceed } = await inquirer.prompt([
+                {
+                    type: 'confirm',
+                    name: 'proceed',
+                    message: 'Push anyway without these files?',
+                    default: false
+                }
+            ]);
+
+            if (!proceed) {
+                messages.info('Push cancelled. Run gitbuddy commit first!', 'GitBuddy Push');
+                return;
+            }
         }
 
-        // Show what we are pushing
+        // Warn if pushing to main or master
+        if (repo.branch === 'main' || repo.branch === 'master') {
+            console.log(
+                boxen(
+                    chalk.yellow(`⚠️  You are pushing directly to "${repo.branch}"!\n\n`) +
+                    chalk.white('This is okay for personal projects.\n') +
+                    chalk.white('But in team projects always use feature branches!\n\n') +
+                    chalk.gray('Tip: gitbuddy branch "feature-name"'),
+                    {
+                        padding: 1,
+                        borderColor: 'yellow',
+                        title: '⚠️  GitBuddy Warning',
+                        titleAlignment: 'center'
+                    }
+                )
+            );
+
+            const { proceed } = await inquirer.prompt([
+                {
+                    type: 'confirm',
+                    name: 'proceed',
+                    message: `Push to "${repo.branch}" anyway?`,
+                    default: true
+                }
+            ]);
+
+            if (!proceed) {
+                messages.info('Push cancelled.', 'GitBuddy Push');
+                return;
+            }
+        }
+
+        // Show pushing message
         console.log(
             boxen(
-                chalk.cyan(`🚀 Pushing "${branch}" to GitHub...\n`) +
-                chalk.gray(`   ${status.ahead} commit(s) will be pushed`),
-                { padding: 1, borderColor: 'cyan', title: '🤖 GitBuddy Push', titleAlignment: 'center' }
+                chalk.cyan(`🚀 Pushing "${repo.branch}" to GitHub...\n`) +
+                chalk.gray(`   ${repo.ahead} commit(s) will be pushed`),
+                {
+                    padding: 1,
+                    borderColor: 'cyan',
+                    title: '🤖 GitBuddy Push',
+                    titleAlignment: 'center'
+                }
             )
         );
 
         // Do the push
-        await git.push('origin', branch, ['--set-upstream']);
+        const pushed = await gitUtils.push(repo.branch);
+        if (!pushed) return;
 
         console.log(
             boxen(
                 chalk.green.bold('✅ Pushed successfully!\n\n') +
-                chalk.white(`🌿 Branch: ${branch}\n`) +
-                chalk.white(`📦 Commits pushed: ${status.ahead}\n\n`) +
+                chalk.white(`🌿 Branch: ${repo.branch}\n`) +
+                chalk.white(`📦 Commits pushed: ${repo.ahead}\n\n`) +
                 chalk.gray('Check your GitHub repo to see the changes!'),
-                { padding: 1, borderColor: 'green', title: '🤖 GitBuddy Push', titleAlignment: 'center' }
+                {
+                    padding: 1,
+                    borderColor: 'green',
+                    title: '🤖 GitBuddy Push',
+                    titleAlignment: 'center'
+                }
             )
         );
 
     } catch (error) {
-        console.log(
-            boxen(
-                chalk.red('❌ Push failed!\n\n') +
-                chalk.yellow('Error: ') + chalk.white(error.message) +
-                chalk.gray('\n\nRun gitbuddy explain for help!'),
-                { padding: 1, borderColor: 'red', title: '🤖 GitBuddy Push', titleAlignment: 'center' }
-            )
-        );
+        messages.gitError(error.message);
     }
 }
 

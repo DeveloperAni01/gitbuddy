@@ -1,106 +1,42 @@
 'use strict';
 
-import simpleGit from 'simple-git';
 import chalk from 'chalk';
 import boxen from 'boxen';
-import fs from 'fs';
-import path from 'path';
+import inquirer from 'inquirer';
+import gitUtils from '../utils/git.js';
+import messages from '../utils/messages.js';
+import detectProjectType from '../utils/detector.js';
 
 // Convert casual message to conventional commit
 function formatCommitMessage(message) {
     const msg = message.toLowerCase();
 
-    if (msg.includes('fix') || msg.includes('bug') || msg.includes('error')) {
+    if (msg.includes('fix') || msg.includes('bug') || msg.includes('error') || msg.includes('issue')) {
         return `fix: ${message}`;
-    } else if (msg.includes('add') || msg.includes('new') || msg.includes('create')) {
+    } else if (msg.includes('add') || msg.includes('new') || msg.includes('create') || msg.includes('feature')) {
         return `feat: ${message}`;
-    } else if (msg.includes('update') || msg.includes('change') || msg.includes('modify')) {
+    } else if (msg.includes('update') || msg.includes('change') || msg.includes('modify') || msg.includes('improve')) {
         return `chore: ${message}`;
-    } else if (msg.includes('remove') || msg.includes('delete')) {
+    } else if (msg.includes('remove') || msg.includes('delete') || msg.includes('clean')) {
         return `chore: ${message}`;
-    } else if (msg.includes('doc') || msg.includes('readme')) {
+    } else if (msg.includes('doc') || msg.includes('readme') || msg.includes('comment')) {
         return `docs: ${message}`;
-    } else if (msg.includes('test')) {
+    } else if (msg.includes('test') || msg.includes('spec')) {
         return `test: ${message}`;
+    } else if (msg.includes('style') || msg.includes('format') || msg.includes('lint')) {
+        return `style: ${message}`;
+    } else if (msg.includes('refactor') || msg.includes('restructure')) {
+        return `refactor: ${message}`;
     } else {
         return `feat: ${message}`;
     }
 }
 
-// Check if node_modules or dangerous files are staged
-function checkDangerousFiles(stagedFiles) {
-    const cwd = process.cwd();
-
-    // Auto detect ALL project types
-    const isNode = fs.existsSync(path.join(cwd, 'package.json'));
-    const isDotNet = fs.readdirSync(cwd).some(f => f.endsWith('.csproj') || f.endsWith('.sln'));
-    const isPython = fs.existsSync(path.join(cwd, 'requirements.txt')) || fs.existsSync(path.join(cwd, 'Pipfile'));
-    const isJava = fs.existsSync(path.join(cwd, 'pom.xml')) || fs.existsSync(path.join(cwd, 'build.gradle'));
-    const isFlutter = fs.existsSync(path.join(cwd, 'pubspec.yaml'));
-    const isRuby = fs.existsSync(path.join(cwd, 'Gemfile'));
-    const isPhp = fs.existsSync(path.join(cwd, 'composer.json'));
-
-    // Always dangerous — every project
-    let dangerous = [
-        '.env',
-        '.env.local',
-        '.env.production',
-        '.env.development',
-        '*.pem',
-        '*.key',
-        'secrets'
-    ];
-
-    // Stack specific
-    if (isNode) {
-        dangerous.push('node_modules');
-    }
-
-    if (isDotNet) {
-        dangerous.push('bin/', 'obj/', 'packages/');
-    }
-
-    if (isPython) {
-        dangerous.push('__pycache__/', '*.pyc', 'venv/', '.venv/', 'env/');
-    }
-
-    if (isJava) {
-        dangerous.push('target/', '*.class', '.gradle/', 'build/');
-    }
-
-    if (isFlutter) {
-        dangerous.push('.dart_tool/', 'build/');
-    }
-
-    if (isRuby) {
-        dangerous.push('vendor/bundle/');
-    }
-
-    if (isPhp) {
-        dangerous.push('vendor/');
-    }
-
-    return stagedFiles.filter(f =>
-        dangerous.some(d => f.includes(d))
-    );
-  }
-
 async function commitCommand(message) {
-    const git = simpleGit();
-
     try {
-        // Check if git repo
-        const isRepo = await git.checkIsRepo();
-        if (!isRepo) {
-            console.log(
-                boxen(
-                    chalk.red('❌ This folder is not a Git repo!\n') +
-                    chalk.yellow('Run: git init first'),
-                    { padding: 1, borderColor: 'red', title: '🤖 GitBuddy Commit', titleAlignment: 'center' }
-                )
-            );
-            return;
-        }
+        // Check repo state
+        const repo = await gitUtils.checkRepo();
+        if (!repo) return;
 
         // Check message provided
         if (!message) {
@@ -110,35 +46,53 @@ async function commitCommand(message) {
                     chalk.yellow('Example:\n') +
                     chalk.cyan('  gitbuddy commit "login page done"\n') +
                     chalk.cyan('  gitbuddy commit "fixed signup bug"'),
-                    { padding: 1, borderColor: 'red', title: '🤖 GitBuddy Commit', titleAlignment: 'center' }
+                    {
+                        padding: 1,
+                        borderColor: 'red',
+                        title: '🤖 GitBuddy Commit',
+                        titleAlignment: 'center'
+                    }
                 )
             );
             return;
         }
 
-        const status = await git.status();
-
-        // Check if nothing to commit
-        if (status.files.length === 0) {
+        // Check nothing to commit
+        if (repo.staged.length === 0 &&
+            repo.modified.length === 0 &&
+            repo.untracked.length === 0) {
             console.log(
                 boxen(
-                    chalk.yellow('🤔 Nothing to commit bro!\n') +
+                    chalk.yellow('🤔 Nothing to commit bro!\n\n') +
                     chalk.gray('No changes detected in your project.'),
-                    { padding: 1, borderColor: 'yellow', title: '🤖 GitBuddy Commit', titleAlignment: 'center' }
+                    {
+                        padding: 1,
+                        borderColor: 'yellow',
+                        title: '🤖 GitBuddy Commit',
+                        titleAlignment: 'center'
+                    }
                 )
             );
             return;
         }
 
-        // Stage all files
-        await git.add('.');
+        // Detect project type
+        const project = detectProjectType();
 
-        // Get staged files after add
-        const newStatus = await git.status();
-        const stagedFiles = newStatus.staged;
+        // Stage all files
+        await gitUtils.stageAll();
+
+        // Get updated status after staging
+        const updatedRepo = await gitUtils.checkRepo();
+        if (!updatedRepo) return;
+
+        const stagedFiles = updatedRepo.staged;
 
         // Check for dangerous files
-        const dangerous = checkDangerousFiles(stagedFiles);
+        const dangerous = stagedFiles.filter(f =>
+            project.dangerousPatterns.some(d => f.includes(d))
+        );
+
         if (dangerous.length > 0) {
             console.log(
                 boxen(
@@ -147,48 +101,73 @@ async function commitCommand(message) {
                     dangerous.map(f => chalk.red(`   ❌ ${f}`)).join('\n') +
                     chalk.yellow('\n\nRun gitbuddy ignore first!\n') +
                     chalk.gray('Then try gitbuddy commit again.'),
-                    { padding: 1, borderColor: 'red', title: '⚠️  GitBuddy Warning', titleAlignment: 'center' }
+                    {
+                        padding: 1,
+                        borderColor: 'red',
+                        title: '⚠️  GitBuddy Warning',
+                        titleAlignment: 'center'
+                    }
                 )
             );
             // Unstage everything
-            await git.reset();
+            await gitUtils.git.reset();
             return;
         }
+
+        // Show files about to be committed
+        console.log(
+            boxen(
+                chalk.cyan.bold('📁 Files about to be committed:\n\n') +
+                stagedFiles.map(f => chalk.green(`   + ${f}`)).join('\n'),
+                {
+                    padding: 1,
+                    borderColor: 'cyan',
+                    title: '🤖 GitBuddy Commit',
+                    titleAlignment: 'center'
+                }
+            )
+        );
 
         // Format commit message
         const formattedMessage = formatCommitMessage(message);
 
-        // Do the commit
-        await git.commit(formattedMessage);
+        // Confirm with user
+        const { confirm } = await inquirer.prompt([
+            {
+                type: 'confirm',
+                name: 'confirm',
+                message: `Commit as "${formattedMessage}"?`,
+                default: true
+            }
+        ]);
 
-        // Build success output
-        let output = '';
-        output += chalk.green.bold('✅ Committed successfully!\n\n');
-        output += chalk.cyan(`📝 Message: "${formattedMessage}"\n\n`);
-        output += chalk.white.bold('📁 Files committed:\n');
-        stagedFiles.forEach(f => {
-            output += chalk.green(`   + ${f}\n`);
-        });
-        output += chalk.gray('\nRun gitbuddy push to send to GitHub!');
+        if (!confirm) {
+            messages.info('Commit cancelled. No changes made.', 'GitBuddy Commit');
+            return;
+        }
+
+        // Do the commit
+        const committed = await gitUtils.commit(formattedMessage);
+        if (!committed) return;
 
         console.log(
-            boxen(output, {
-                padding: 1,
-                borderColor: 'green',
-                title: '🤖 GitBuddy Commit',
-                titleAlignment: 'center'
-            })
+            boxen(
+                chalk.green.bold('✅ Committed successfully!\n\n') +
+                chalk.cyan(`📝 Message: "${formattedMessage}"\n\n`) +
+                chalk.white.bold('📁 Files committed:\n') +
+                stagedFiles.map(f => chalk.green(`   + ${f}`)).join('\n') +
+                chalk.gray('\n\nRun gitbuddy push to send to GitHub!'),
+                {
+                    padding: 1,
+                    borderColor: 'green',
+                    title: '🤖 GitBuddy Commit',
+                    titleAlignment: 'center'
+                }
+            )
         );
 
     } catch (error) {
-        console.log(
-            boxen(
-                chalk.red('❌ Commit failed!\n\n') +
-                chalk.yellow('Error: ') + chalk.white(error.message) +
-                chalk.gray('\n\nRun gitbuddy explain for help!'),
-                { padding: 1, borderColor: 'red', title: '🤖 GitBuddy Commit', titleAlignment: 'center' }
-            )
-        );
+        messages.gitError(error.message);
     }
 }
 
