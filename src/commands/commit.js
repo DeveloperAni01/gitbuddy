@@ -2,7 +2,7 @@
 
 import chalk from 'chalk';
 import boxen from 'boxen';
-import inquirer from 'inquirer';
+import { confirm} from '@inquirer/prompts';
 import gitUtils from '../utils/git.js';
 import messages from '../utils/messages.js';
 import detectProjectType from '../utils/detector.js';
@@ -46,12 +46,7 @@ async function commitCommand(message) {
                     chalk.yellow('Example:\n') +
                     chalk.cyan('  gitbuddy commit "login page done"\n') +
                     chalk.cyan('  gitbuddy commit "fixed signup bug"'),
-                    {
-                        padding: 1,
-                        borderColor: 'red',
-                        title: '🤖 GitBuddy Commit',
-                        titleAlignment: 'center'
-                    }
+                    { padding: 1, borderColor: 'red', title: '🤖 GitBuddy Commit', titleAlignment: 'center' }
                 )
             );
             return;
@@ -65,12 +60,7 @@ async function commitCommand(message) {
                 boxen(
                     chalk.yellow('🤔 Nothing to commit bro!\n\n') +
                     chalk.gray('No changes detected in your project.'),
-                    {
-                        padding: 1,
-                        borderColor: 'yellow',
-                        title: '🤖 GitBuddy Commit',
-                        titleAlignment: 'center'
-                    }
+                    { padding: 1, borderColor: 'yellow', title: '🤖 GitBuddy Commit', titleAlignment: 'center' }
                 )
             );
             return;
@@ -101,15 +91,9 @@ async function commitCommand(message) {
                     dangerous.map(f => chalk.red(`   ❌ ${f}`)).join('\n') +
                     chalk.yellow('\n\nRun gitbuddy ignore first!\n') +
                     chalk.gray('Then try gitbuddy commit again.'),
-                    {
-                        padding: 1,
-                        borderColor: 'red',
-                        title: '⚠️  GitBuddy Warning',
-                        titleAlignment: 'center'
-                    }
+                    { padding: 1, borderColor: 'red', title: '⚠️  GitBuddy Warning', titleAlignment: 'center' }
                 )
             );
-            // Unstage everything
             await gitUtils.git.reset();
             return;
         }
@@ -119,12 +103,7 @@ async function commitCommand(message) {
             boxen(
                 chalk.cyan.bold('📁 Files about to be committed:\n\n') +
                 stagedFiles.map(f => chalk.green(`   + ${f}`)).join('\n'),
-                {
-                    padding: 1,
-                    borderColor: 'cyan',
-                    title: '🤖 GitBuddy Commit',
-                    titleAlignment: 'center'
-                }
+                { padding: 1, borderColor: 'cyan', title: '🤖 GitBuddy Commit', titleAlignment: 'center' }
             )
         );
 
@@ -132,16 +111,12 @@ async function commitCommand(message) {
         const formattedMessage = formatCommitMessage(message);
 
         // Confirm with user
-        const { confirm } = await inquirer.prompt([
-            {
-                type: 'confirm',
-                name: 'confirm',
-                message: `Commit as "${formattedMessage}"?`,
-                default: true
-            }
-        ]);
+        const confirmed = await confirm({
+            message: `Commit as "${formattedMessage}"?`,
+            default: true
+        });
 
-        if (!confirm) {
+        if (!confirmed) {
             messages.info('Commit cancelled. No changes made.', 'GitBuddy Commit');
             return;
         }
@@ -156,19 +131,14 @@ async function commitCommand(message) {
                 chalk.cyan(`📝 Message: "${formattedMessage}"\n\n`) +
                 chalk.white.bold('📁 Files committed:\n') +
                 stagedFiles.map(f => chalk.green(`   + ${f}`)).join('\n') +
-                chalk.gray('\n\nRun gitbuddy push to send to GitHub!'),
-                {
-                    padding: 1,
-                    borderColor: 'green',
-                    title: '🤖 GitBuddy Commit',
-                    titleAlignment: 'center'
-                }
+                chalk.gray('\n\n💡 Tip: Run gitbuddy push to send to GitHub!'),
+                { padding: 1, borderColor: 'green', title: '🤖 GitBuddy Commit', titleAlignment: 'center' }
             )
         );
 
     } catch (error) {
         messages.gitError(error.message);
     }
-}
+  }
 
 export default commitCommand;
