@@ -4,6 +4,7 @@ import { program } from 'commander';
 import statusCommand from '../src/commands/status.js';
 import ignoreCommand from '../src/commands/ignore.js';
 import commitCommand from '../src/commands/commit.js';
+import pushCommand from '../src/commands/push.js';
 
 program
     .name('gitbuddy')
@@ -24,5 +25,10 @@ program
     .command('commit <message>')
     .description('Smart commit with safety checks')
     .action(commitCommand);
+
+program
+    .command('push')
+    .description('Safely push to GitHub')
+    .action(pushCommand);
 
 program.parse(process.argv);
