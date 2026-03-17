@@ -11,6 +11,10 @@ import branchCommand from '../src/commands/branch.js';
 import switchCommand from '../src/commands/switch.js';
 import mergeCommand from '../src/commands/merge.js';
 import undoCommand from '../src/commands/undo.js';
+import historyCommand from '../src/commands/history.js';
+import diffCommand from '../src/commands/diff.js';
+import explainCommand from '../src/commands/explain.js';
+import langCommand from '../src/commands/lang.js';
 
 // ✅ Check Git installed FIRST
 const gitInstalled = await checkGitInstalled();
@@ -65,5 +69,24 @@ program
     .command('undo')
     .description('Safely undo git actions')
     .action(undoCommand);
+
+program
+    .command('history')
+    .description('Show commit history in plain English')
+    .action(historyCommand);
+
+program
+    .command('diff')
+    .description('Show what changed in your files')
+    .action(diffCommand);
+program
+    .command('explain [error]')
+    .description('Explain git errors in plain English')
+    .action(explainCommand);
+
+program
+    .command('lang')
+    .description('Change GitBuddy language')
+    .action(langCommand);
 
 program.parse(process.argv);
